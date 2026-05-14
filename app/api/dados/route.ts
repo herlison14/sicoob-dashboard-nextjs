@@ -1,10 +1,84 @@
 import { NextRequest, NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+/**
+ * Normaliza valores que vêm do ExcelJS:
+ *  - { result, formula } → result
+ *  - { richText: [...] } → texto concatenado
+ *  - Date → ISO string
+ *  - números, strings, booleanos → mantém
+ */
+function normalizeValue(value: unknown): unknown {
+  if (value === null || value === undefined) return null;
+
+  if (typeof value === 'object') {
+    // Fórmulas
+    if ('result' in (value as Record<string, unknown>)) {
+      return normalizeValue((value as { result: unknown }).result);
+    }
+    // RichText
+    if ('richText' in (value as Record<string, unknown>)) {
+      const rt = (value as { richText: Array<{ text: string }> }).richText;
+      return rt.map((r) => r.text).join('');
+    }
+    // Data
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+    // Hyperlink
+    if ('text' in (value as Record<string, unknown>)) {
+      return (value as { text: string }).text;
+    }
+    // Errors
+    if ('error' in (value as Record<string, unknown>)) {
+      return null;
+    }
+  }
+
+  return value;
+}
+
+function normalizeHeader(value: unknown): string {
+  const normalized = normalizeValue(value);
+  if (normalized === null || normalized === undefined) return '';
+  return String(normalized).trim();
+}
+
+function parseSheet(worksheet: ExcelJS.Worksheet): Record<string, unknown>[] {
+  const headers: string[] = [];
+  const headerRow = worksheet.getRow(1);
+
+  headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+    headers[colNumber] = normalizeHeader(cell.value);
+  });
+
+  const rows: Record<string, unknown>[] = [];
+  worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (rowNumber === 1) return;
+
+    const obj: Record<string, unknown> = {};
+    let hasData = false;
+
+    headers.forEach((header, colNumber) => {
+      if (!header) return;
+      const value = normalizeValue(row.getCell(colNumber).value);
+      if (value !== null && value !== '') hasData = true;
+      obj[header] = value;
+    });
+
+    if (hasData) rows.push(obj);
+  });
+
+  return rows;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    const file = formData.get('file') as File;
+    const file = formData.get('file') as File | null;
 
     if (!file) {
       return NextResponse.json(
@@ -13,71 +87,69 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const buffer = await file.arrayBuffer();
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
-
-    // Extrair abas
-    const cooperadosSheet = workbook.getWorksheet('cooperados');
-    const historicoSheet = workbook.getWorksheet('historico_capital');
-    const parametrosSheet = workbook.getWorksheet('parametros');
-
-    if (!cooperadosSheet || !historicoSheet || !parametrosSheet) {
+    if (!file.name.match(/\.(xlsx|xlsm)$/i)) {
       return NextResponse.json(
-        { error: 'Arquivo Excel inválido. Certifique-se de ter as abas: cooperados, historico_capital, parametros' },
+        { error: 'Formato inválido. Use arquivos .xlsx' },
         { status: 400 }
       );
     }
 
-    // Parse cooperados
-    const coopData: any[] = [];
-    cooperadosSheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return; // Skip header
+    const buffer = await file.arrayBuffer();
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
 
-      const obj: any = {};
-      cooperadosSheet.getRow(1).eachCell((cell, colNumber) => {
-        const header = cell.value as string;
-        const value = row.getCell(colNumber).value;
-        obj[header] = value;
+    // Procurar abas (case-insensitive)
+    const findSheet = (name: string) =>
+      workbook.worksheets.find(
+        (ws) => ws.name.toLowerCase().trim() === name.toLowerCase().trim()
+      );
+
+    const cooperadosSheet = findSheet('cooperados');
+    const historicoSheet = findSheet('historico_capital');
+    const parametrosSheet = findSheet('parametros');
+
+    if (!cooperadosSheet) {
+      return NextResponse.json(
+        {
+          error: `Aba 'cooperados' não encontrada. Abas disponíveis: ${workbook.worksheets
+            .map((ws) => ws.name)
+            .join(', ')}`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const coop = parseSheet(cooperadosSheet);
+    const hist = historicoSheet ? parseSheet(historicoSheet) : [];
+
+    // Parâmetros: chave/valor (col1/col2)
+    const params: Record<string, unknown> = {};
+    if (parametrosSheet) {
+      parametrosSheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        if (rowNumber === 1) return;
+        const key = normalizeHeader(row.getCell(1).value);
+        const val = normalizeValue(row.getCell(2).value);
+        if (key) params[key] = val;
       });
-      coopData.push(obj);
-    });
-
-    // Parse histórico
-    const histData: any[] = [];
-    historicoSheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return;
-
-      const obj: any = {};
-      historicoSheet.getRow(1).eachCell((cell, colNumber) => {
-        const header = cell.value as string;
-        const value = row.getCell(colNumber).value;
-        obj[header] = value;
-      });
-      histData.push(obj);
-    });
-
-    // Parse parâmetros
-    const paramsObj: Record<string, any> = {};
-    parametrosSheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return;
-
-      const param = row.getCell(1).value;
-      const valor = row.getCell(2).value;
-      if (param && valor !== null && valor !== undefined) {
-        paramsObj[param as string] = valor;
-      }
-    });
+    }
 
     return NextResponse.json({
-      coop: coopData,
-      hist: histData,
-      params: paramsObj,
+      coop,
+      hist,
+      params,
+      meta: {
+        cooperados: coop.length,
+        historico: hist.length,
+        parametros: Object.keys(params).length,
+      },
     });
   } catch (error) {
     console.error('Erro ao processar Excel:', error);
     return NextResponse.json(
-      { error: 'Erro ao processar arquivo Excel' },
+      {
+        error: 'Erro ao processar arquivo Excel',
+        details: error instanceof Error ? error.message : 'desconhecido',
+      },
       { status: 500 }
     );
   }

@@ -1,36 +1,93 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+
+export interface Cooperado {
+  Empresa?: string;
+  CNPJ?: string;
+  Familia?: string; // C1, C2, C3
+  Saldo_Devedor?: number;
+  Capital_Integralizado?: number;
+  Pct_Capital?: number;
+  Gap_Pct?: number;
+  Necessidade_Capital?: number;
+  Status?: string; // Blindada, Mediana, Desenquadrada
+  CRL_Anterior?: number | string;
+  CRL_Atual?: number | string;
+  Tendencia?: string; // Piora, Estavel, Melhora, Sem dado
+  [key: string]: unknown;
+}
+
+export interface HistoricoItem {
+  Mes_Ano?: string;
+  Capital_Integralizado?: number;
+  [key: string]: unknown;
+}
 
 export interface DashboardData {
-  coop: any[];
-  hist: any[];
-  params: Record<string, any>;
+  coop: Cooperado[];
+  hist: HistoricoItem[];
+  params: Record<string, unknown>;
 }
 
 interface DataContextType {
   data: DashboardData | null;
-  setData: (data: DashboardData) => void;
+  setData: (data: DashboardData | null) => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
   error: string | null;
   setError: (error: string | null) => void;
+  clearData: () => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+const STORAGE_KEY = 'sicoob_dashboard_data';
+
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [data, setDataState] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Hidratar do sessionStorage no primeiro render
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        setDataState(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.error('Erro ao carregar dados do sessionStorage:', e);
+    }
+    setHydrated(true);
+  }, []);
+
+  const setData = (newData: DashboardData | null) => {
+    setDataState(newData);
+    try {
+      if (newData) {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+      } else {
+        sessionStorage.removeItem(STORAGE_KEY);
+      }
+    } catch (e) {
+      console.error('Erro ao salvar dados:', e);
+    }
+  };
+
+  const clearData = () => {
+    setData(null);
+  };
 
   const value: DataContextType = {
-    data,
+    data: hydrated ? data : null,
     setData,
     isLoading,
     setIsLoading,
     error,
     setError,
+    clearData,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

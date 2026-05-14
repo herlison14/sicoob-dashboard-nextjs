@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { DataProvider } from "./context/DataContext";
+import Providers from "./components/Providers";
+import AppShell from "./components/AppShell";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,10 +15,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className="h-full">
-      <body className="h-full bg-gray-50 text-gray-900">
-        <DataProvider>
-          {children}
-        </DataProvider>
+      <body className="h-full bg-gray-50 text-gray-900 antialiased">
+        <Providers>
+          <AppShell>{children}</AppShell>
+        </Providers>
       </body>
     </html>
   );
