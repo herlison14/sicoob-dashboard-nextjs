@@ -33,18 +33,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: {
     signIn: '/login',
   },
-  callbacks: {
-    authorized({ request, auth }) {
-      const { pathname } = request.nextUrl;
-
-      // Rotas públicas (sem autenticação)
-      const publicRoutes = ['/login'];
-      if (publicRoutes.includes(pathname)) {
-        return true;
-      }
-
-      // Rotas protegidas (requer autenticação)
-      return !!auth;
-    },
-  },
 });
