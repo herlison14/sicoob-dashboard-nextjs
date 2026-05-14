@@ -1,7 +1,7 @@
 import { auth } from '@/auth';
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
-export default auth((req) => {
+export default auth((req: NextRequest) => {
   const { pathname } = req.nextUrl;
   const publicRoutes = ['/login'];
 
