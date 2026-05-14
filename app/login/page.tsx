@@ -1,15 +1,23 @@
 'use client';
 
-import { signIn } from 'next-auth/react';
-import { useState } from 'react';
+import { signIn, useSession } from 'next-auth/react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { status } = useSession();
   const [email, setEmail] = useState('admin@sicoob.com.br');
   const [password, setPassword] = useState('sicoob123');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Se já estiver autenticado, redireciona automaticamente
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.replace('/dashboard');
+    }
+  }, [status, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,12 +33,16 @@ export default function LoginPage() {
 
       if (result?.error) {
         setError('Email ou senha inválidos');
+        setLoading(false);
       } else if (result?.ok) {
-        router.push('/dashboard');
+        // Force full page navigation para garantir que o cookie de sessão seja lido
+        window.location.href = '/dashboard';
+      } else {
+        setError('Erro inesperado no login');
+        setLoading(false);
       }
-    } catch (err) {
+    } catch {
       setError('Erro ao fazer login');
-    } finally {
       setLoading(false);
     }
   };
