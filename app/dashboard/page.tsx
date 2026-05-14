@@ -20,6 +20,7 @@ import { useData } from '../context/DataContext';
 import KPICard from '../components/KPICard';
 import PageHeader from '../components/PageHeader';
 import ChartCard from '../components/ChartCard';
+import DiagnosticBanner from '../components/DiagnosticBanner';
 import { formatCurrency, formatPercent, sumBy, toNumber, toStr } from '../utils/formatters';
 
 const COLORS = {
@@ -76,7 +77,7 @@ export default function DashboardPage() {
       }
 
       if (!result.coop || result.coop.length === 0) {
-        throw new Error('Arquivo Excel sem cooperados. Verifique a aba "cooperados".');
+        throw new Error('Arquivo Excel sem dados de cooperados. Verifique se há ao menos uma aba com colunas como CNPJ, Saldo, Capital.');
       }
 
       setData(result);
@@ -232,6 +233,8 @@ export default function DashboardPage() {
         } · ${stats.coop.length} cooperados PJ analisados`}
         icon="📊"
       />
+
+      <DiagnosticBanner meta={data.meta} />
 
       {/* KPIs Principais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

@@ -24,10 +24,20 @@ export interface HistoricoItem {
   [key: string]: unknown;
 }
 
+export interface DashboardMeta {
+  cooperados?: number;
+  historico?: number;
+  parametros?: number;
+  principalSheet?: string;
+  columnMap?: Record<string, string>;
+  allSheets?: Array<{ name: string; rows: number; headers: string[]; score?: number }>;
+}
+
 export interface DashboardData {
   coop: Cooperado[];
   hist: HistoricoItem[];
   params: Record<string, unknown>;
+  meta?: DashboardMeta;
 }
 
 interface DataContextType {
