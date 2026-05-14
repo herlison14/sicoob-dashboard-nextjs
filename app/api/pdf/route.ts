@@ -32,9 +32,9 @@ export async function POST(request: NextRequest) {
     doc.text(`Cooperados Analisados: ${coop.length}`);
 
     doc.moveDown();
-    doc.fontSize(9).text(
+    doc.fontSize(9).fillColor('#666').text(
       'Relatório gerado automaticamente via dashboard Sicoob.',
-      { align: 'center', color: '#666' }
+      { align: 'center' }
     );
 
     doc.end();
