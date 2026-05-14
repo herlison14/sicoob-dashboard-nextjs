@@ -1,14 +1,15 @@
+import type { NextAuthOptions } from 'next-auth';
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Senha', type: 'password' },
       },
-      authorize(credentials) {
+      async authorize(credentials) {
         // ⚠️ Demo: hardcoded user. Em produção, validar contra banco de dados
         const user = {
           email: 'admin@sicoob.com.br',
@@ -33,4 +34,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: {
     signIn: '/login',
   },
-});
+};
+
+export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);
