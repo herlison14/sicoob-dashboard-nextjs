@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     doc.end();
 
-    return new Promise((resolve) => {
+    return new Promise<Response>((resolve) => {
       doc.on('end', () => {
         const pdfBuffer = Buffer.concat(chunks);
         resolve(
